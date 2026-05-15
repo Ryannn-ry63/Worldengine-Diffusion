@@ -1,9 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init *)",
-      "Bash(git remote *)",
-      "Bash(git add *)"
+      "Bash(python -m py_compile \"F:/OneDrive/桌面/研0/WE1/WorldEngine-main/projects/AlgEngine/mmdet3d_plugin/navformer/dense_heads/diffusion_planning_head.py\")",
+      "Bash(python -m py_compile \"F:/OneDrive/桌面/研0/WE1/WorldEngine-main/projects/AlgEngine/configs/navformer/e2e_diffusiondrive.py\")",
+      "Bash(python -m py_compile \"F:/OneDrive/桌面/研0/WE1/WorldEngine-main/projects/AlgEngine/mmdet3d_plugin/navformer/dense_heads/__init__.py\")",
+      "Bash(python *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(where codex *)",
+      "Bash(codex *)",
+      "Bash(claude plugin *)",
+      "Skill(codex:rescue)",
+      "Bash(node *)",
+      "Bash(curl *)",
+      "Read(//c/Users/HP/.codex/**)",
+      "Bash(where cc-switch *)",
+      "Read(//c/Users/HP/**)",
+      "Bash(find /f -name \"cc-switch*\" -maxdepth 3)",
+      "Bash(start *)",
+      "Bash(HTTP_PROXY=\"http://127.0.0.1:7890\" HTTPS_PROXY=\"http://127.0.0.1:7890\" ALL_PROXY=\"http://127.0.0.1:7890\" node *)"
     ]
   }
 }
