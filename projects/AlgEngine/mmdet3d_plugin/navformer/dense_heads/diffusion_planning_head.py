@@ -211,17 +211,24 @@ class LossComputer(nn.Module):
         self.cls_loss_weight = cls_loss_weight
         self.reg_loss_weight = reg_loss_weight
 
-    def forward(self, poses_reg, poses_cls, target_traj, plan_anchor):
+    def forward(self, poses_reg, poses_cls, target_traj, plan_anchor, target_mask=None):
         """
         poses_reg: (B, M, T, 3)
         poses_cls: (B, M)
         target_traj: (B, T, 3)
         plan_anchor: (B, M, T, 2)
+        target_mask: optional (B, T), 1 for valid future waypoints
         """
         bs, num_mode, ts, d = poses_reg.shape
 
+        if target_mask is None:
+            target_mask = target_traj.new_ones((bs, ts))
+        else:
+            target_mask = target_mask.to(dtype=target_traj.dtype, device=target_traj.device)
+
         dist = torch.linalg.norm(target_traj.unsqueeze(1)[..., :2] - plan_anchor, dim=-1)
-        dist = dist.mean(dim=-1)
+        valid_count = target_mask.sum(dim=-1).clamp_min(1.0)
+        dist = (dist * target_mask[:, None]).sum(dim=-1) / valid_count[:, None]
         cls_target = torch.argmin(dist, dim=-1)
 
         gather_idx = cls_target[..., None, None, None].repeat(1, 1, ts, d)
@@ -241,7 +248,11 @@ class LossComputer(nn.Module):
             reduction="mean",
             avg_factor=None,
         )
-        reg_loss = self.reg_loss_weight * F.l1_loss(best_reg, target_traj)
+        reg_weight = target_mask[..., None]
+        reg_denorm = reg_weight.sum().clamp_min(1.0) * d
+        reg_loss = self.reg_loss_weight * (
+            torch.abs(best_reg - target_traj) * reg_weight
+        ).sum() / reg_denorm
         return cls_loss, reg_loss
 
 
@@ -916,17 +927,22 @@ class DiffusionPlanningHead(nn.Module):
         # (T_full == num_poses == 8 in the current pipeline). DiffusionDrive's
         # supervision is the 8-step trajectory at native rate.
         target_traj = sdc_planning[:, 0]  # (B, T_full, 3)
+        target_mask = None
+        if sdc_planning_mask is not None:
+            target_mask = sdc_planning_mask[:, 0, :, 0].float()
         if target_traj.shape[1] != self._num_poses:
             # Fall back to the same 4::5 stride that TrajScoringHead uses, so the
             # head still works if the dataset emits a 40-step ground truth.
             target_traj = target_traj[:, 4::5]
+            if target_mask is not None:
+                target_mask = target_mask[:, 4::5]
 
         plan_anchor = result["plan_anchor_expanded"]
         cls_total = sdc_planning.new_zeros(())
         reg_total = sdc_planning.new_zeros(())
         for poses_reg, poses_cls in zip(result["poses_reg_list"], result["poses_cls_list"]):
             cls_loss, reg_loss = self.loss_computer(
-                poses_reg, poses_cls, target_traj, plan_anchor
+                poses_reg, poses_cls, target_traj, plan_anchor, target_mask
             )
             cls_total = cls_total + cls_loss
             reg_total = reg_total + reg_loss
